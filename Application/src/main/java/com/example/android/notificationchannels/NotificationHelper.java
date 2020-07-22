@@ -48,6 +48,8 @@ class NotificationHelper extends ContextWrapper {
     // Key for the string that's delivered in the action's intent.
     private static final String KEY_TEXT_REPLY = "key_text_reply";
 
+    private static final String KEY_TEXT_REPLY_2 = "key_text_reply_2";
+
     private static BroadcastReceiver mBroadcastReceiver = new TestBroadcastReceiver();
 
     private Context mContext;
@@ -113,6 +115,7 @@ class NotificationHelper extends ContextWrapper {
         String replyLabel = "reply";
         RemoteInput remoteInput = new RemoteInput.Builder(KEY_TEXT_REPLY)
                 .setLabel(replyLabel)
+                .setChoices(new CharSequence[] { "choiceA", "choiceB" })
                 .build();
 
         Intent snoozeIntent = new Intent("com.example.android.action_snooze");
