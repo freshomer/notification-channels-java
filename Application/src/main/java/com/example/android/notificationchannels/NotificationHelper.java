@@ -31,6 +31,7 @@ import android.content.IntentFilter;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.support.v4.app.NotificationManagerCompat;
+import android.util.Log;
 
 import java.util.Random;
 
@@ -87,7 +88,7 @@ class NotificationHelper extends ContextWrapper {
         dmChannel.setShowBadge(true);
         getNotificationManager().createNotificationChannel(dmChannel);
         IntentFilter filter = new IntentFilter("com.example.android.action_snooze");
-        context.registerReceiver(mBroadcastReceiver, filter);
+        getApplicationContext().registerReceiver(mBroadcastReceiver, filter);
     }
 
     /**
@@ -243,7 +244,7 @@ class NotificationHelper extends ContextWrapper {
         @Override
         public void onReceive(Context context, Intent intent) {
             CharSequence messageText = getMessageText(intent);
-
+            Log.d("NotificationHelper", "Receive message text: " + messageText);
 //            CharSequence[] oldHistory = sbn.getNotification().extras
 //                    .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
             CharSequence[] oldHistory = null;
