@@ -50,7 +50,7 @@ class NotificationHelper extends ContextWrapper {
 
     private static final String KEY_TEXT_REPLY_2 = "key_text_reply_2";
 
-    private static BroadcastReceiver mBroadcastReceiver = new TestBroadcastReceiver();
+    private BroadcastReceiver mBroadcastReceiver = new TestBroadcastReceiver(this);
 
     private Context mContext;
 
@@ -93,6 +93,10 @@ class NotificationHelper extends ContextWrapper {
         getApplicationContext().registerReceiver(mBroadcastReceiver, filter);
     }
 
+    public Notification.Builder getNotificationFollower(String title, String body) {
+        return getNotificationFollower(title, body, false);
+    }
+
     /**
      * Get a follow/un-follow notification
      *
@@ -103,7 +107,7 @@ class NotificationHelper extends ContextWrapper {
      * @param body the body text for the notification
      * @return A Notification.Builder configured with the selected channel and details
      */
-    public Notification.Builder getNotificationFollower(String title, String body) {
+    public Notification.Builder getNotificationFollower(String title, String body, boolean withChoices) {
         Notification.Builder builder = new Notification.Builder(getApplicationContext(), FOLLOWERS_CHANNEL)
                 .setContentTitle(title)
                 .setContentText(body)
@@ -113,12 +117,22 @@ class NotificationHelper extends ContextWrapper {
 
 
         String replyLabel = "reply";
-        RemoteInput remoteInput = new RemoteInput.Builder(KEY_TEXT_REPLY)
-                .setLabel(replyLabel)
-                .setChoices(new CharSequence[] { "choiceA", "choiceB" })
-                .build();
+        RemoteInput.Builder remoteInputBuilder = new RemoteInput.Builder(KEY_TEXT_REPLY);
+        remoteInputBuilder.setLabel(replyLabel);
+        if (withChoices) {
+            remoteInputBuilder.setChoices(new CharSequence[]{"choiceA", "choiceB"});
+        }
+//        RemoteInput remoteInput = new RemoteInput.Builder(KEY_TEXT_REPLY)
+//                .setLabel(replyLabel)
+//                .setChoices(new CharSequence[] { "choiceA", "choiceB" })
+//                .build();
+
+        RemoteInput remoteInput = remoteInputBuilder.build();
 
         Intent snoozeIntent = new Intent("com.example.android.action_snooze");
+        snoozeIntent.putExtra("choices", withChoices);
+        snoozeIntent.putExtra("title", title);
+        snoozeIntent.putExtra("body", body);
 //        snoozeIntent.setAction("com.example.android.action_snooze");
 //        snoozeIntent.putExtra(EXTRA_NOTIFICATION_ID, 0);
 //        snoozeIntent.setClass(mContext, TestBroadcastReceiver.class);
@@ -155,12 +169,22 @@ class NotificationHelper extends ContextWrapper {
      * @return A Notification.Builder configured with the selected channel and details
      */
     public Notification.Builder getNotificationDM(String title, String body) {
-        return new Notification.Builder(getApplicationContext(), DIRECT_MESSAGE_CHANNEL)
+        Notification.Builder builder = new Notification.Builder(getApplicationContext(), DIRECT_MESSAGE_CHANNEL)
                 .setContentTitle(title)
                 .setContentText(body)
                 .setSmallIcon(getSmallIcon())
                 .setAutoCancel(true)
                 .setContentIntent(getPendingIntent());
+        Intent intent = new Intent(this, NotificationStyleActivity.class);
+        intent.setAction("com.example.android.action_snooze");
+        PendingIntent pendingIntent = PendingIntent.getActivity(mContext,
+                1002,
+                intent,
+                0);
+        Notification.Action action = new Notification.Action.Builder(R.drawable.ic_launcher, "CUSTOM ACTION",
+                pendingIntent).build();
+        builder.addAction(action);
+        return builder;
     }
 
     /**
@@ -169,7 +193,7 @@ class NotificationHelper extends ContextWrapper {
      * @return A PendingIntent that opens the MainActivity
      */
     private PendingIntent getPendingIntent() {
-        Intent openMainIntent = new Intent(this, MainActivity.class);
+        Intent openMainIntent = new Intent(this, NotificationStyleActivity.class);
 
         // The stack builder object will contain an artificial back stack for the
         // started Activity.
@@ -177,7 +201,7 @@ class NotificationHelper extends ContextWrapper {
         // your application to the Home screen.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
         // Adds the back stack for the Intent (but not the Intent itself)
-        stackBuilder.addParentStack(MainActivity.class);
+        stackBuilder.addParentStack(NotificationStyleActivity.class);
         // Adds the Intent that starts the Activity to the top of the stack
         stackBuilder.addNextIntent(openMainIntent);
         return stackBuilder.getPendingIntent(0, PendingIntent.FLAG_ONE_SHOT);
@@ -192,7 +216,7 @@ class NotificationHelper extends ContextWrapper {
         // your application to the Home screen.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
         // Adds the back stack for the Intent (but not the Intent itself)
-        stackBuilder.addParentStack(MainActivity.class);
+        stackBuilder.addParentStack(NotificationStyleActivity.class);
         // Adds the Intent that starts the Activity to the top of the stack
         stackBuilder.addNextIntent(openMainIntent);
         return stackBuilder.getPendingIntent(0, PendingIntent.FLAG_ONE_SHOT);
@@ -244,13 +268,23 @@ class NotificationHelper extends ContextWrapper {
 
     public static class TestBroadcastReceiver extends BroadcastReceiver {
 
+        CharSequence[] oldHistory = null;
+
+        private NotificationHelper notificationHelper;
+
+        public TestBroadcastReceiver(NotificationHelper helper) {
+            notificationHelper = helper;
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
             CharSequence messageText = getMessageText(intent);
             Log.d("NotificationHelper", "Receive message text: " + messageText);
+
+            NotificationStyleActivity.sInstance.setReceivedMessage(messageText);
 //            CharSequence[] oldHistory = sbn.getNotification().extras
 //                    .getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY);
-            CharSequence[] oldHistory = null;
+//            CharSequence[] oldHistory = null;
             CharSequence[] newHistory;
             if (oldHistory == null) {
                 newHistory = new CharSequence[1];
@@ -259,18 +293,22 @@ class NotificationHelper extends ContextWrapper {
                 System.arraycopy(oldHistory, 0, newHistory, 1, oldHistory.length);
             }
             newHistory[0] = String.valueOf(messageText);
+            oldHistory = newHistory;
 
             // Build a new notification, which informs the user that the system
             // handled their interaction with the previous notification.
-            Notification repliedNotification = new Notification.Builder(context, FOLLOWERS_CHANNEL)
-                    .setSmallIcon(R.drawable.ic_launcher)
-                    .setContentText("Received")
-                    .setRemoteInputHistory(newHistory)
-                    .build();
+//            Notification repliedNotification = new Notification.Builder(context, FOLLOWERS_CHANNEL)
+//                    .setSmallIcon(R.drawable.ic_launcher)
+//                    .setContentText("Received")
+//                    .setRemoteInputHistory(newHistory)
+//                    .build();
+            Notification.Builder notificationFollower =
+                    notificationHelper.getNotificationFollower("title", "body");
+            notificationFollower.setRemoteInputHistory(newHistory);
 
             // Issue the new notification.
             NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
-            notificationManager.notify(NOTIFICATION_FOLLOW, repliedNotification);
+            notificationManager.notify(NOTIFICATION_FOLLOW, notificationFollower.build());
         }
 
         private CharSequence getMessageText(Intent intent) {
